@@ -1,3 +1,4 @@
+import os
 import gspread
 import time
 from datetime import datetime
@@ -24,7 +25,7 @@ def clearCells(range):
         dest_sheet.update_cell(int(cell.row), int(cell.col), "")
 
 # FIXME: should probably make these into environment vars
-account = gspread.login("", "")
+account = gspread.login(os.environ["GSPREAD_USERNAME"], os.environ["GSPREAD_PASSWORD"])
 
 #need a spreadsheet and its first worksheet
 src_sheet  = account.open("Test").sheet1
