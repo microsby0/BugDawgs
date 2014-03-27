@@ -2,6 +2,7 @@ import os
 import gspread
 import time
 from datetime import datetime
+import re
 
 def setUpHeaders(student_sheet):
     student_sheet.update_acell('A1',"Events")
@@ -11,18 +12,21 @@ def setUpHeaders(student_sheet):
     student_sheet.update_acell('E1',"Special Notes")
     student_sheet.update_acell('F1',"Call if you need me 706-614-3328 (cell) 706-542-1238 (office)\nYou can also send a text, which I can access more easily in meetings and at home. Thanks and Good Luck! \nMarianne")
 
-
-def dataCount(rows):
-    print "Number of Rows: " + str(len(rows)) #number of rows
-    i=1
-    for row in rows:
-        print "Columns in Row: " + str(i) + ": " + str(len(row)) #number of columns
-        i+=1
-
 def clearCells(range):
+    #A2:E number of rows
     cell_list = student_sheet.range(range)
     for cell in cell_list:
         student_sheet.update_cell(int(cell.row), int(cell.col), "")
+
+def stringToDatetime(content):
+    try:
+        result = re.search("\d\d/\d\d/\d\d\d\d",content).group(0)
+        result = datetime.strptime(result,"%m/%d/%Y")
+        return result
+    except AttributeError:
+         print "Error---------------\n" + content
+
+
 
 account = gspread.login(os.environ["GSPREAD_USERNAME"], os.environ["GSPREAD_PASSWORD"])
 
@@ -50,28 +54,20 @@ groupAge        = ""
 #message and headers are in row 1
 currentRow = 2
 
-#sformats dates in src sheet
+#formats dates in src sheet
 for row in src_rows:
     date = datetime.strptime(row[2], "%m/%d/%Y")
-    print date
-    row[2] = {'formattedDate': date, 'rawDate': row[2]}
+    row[2] = date
 
 # sorts src_sheet based on date of event
-src_rows = sorted(src_rows, key=lambda row: row[2]['formattedDate'])
-
-print "\nSorted"
-
-for row in src_rows:
-    print row[2]['formattedDate']
 
 #puts info from src_sheet into variables
+src_sheet_row_list = []
 for row in src_rows:
     groupName = row[1]
 
     #Visit Date
-    d = datetime.strptime(row[2]['rawDate'], "%m/%d/%Y")
-    #d = row[2]['formattedDate']
-    visitDate = d.strftime("%A") + ", " + row[2]['rawDate']
+    visitDate = "Date: " + row[2].strftime("%A, %m/%d/%Y")
 
     #Visit Time
     #formats time to AM/PM 12 hour
@@ -102,30 +98,47 @@ for row in src_rows:
         location + "\n" +
         address
     )
+    src_sheet_row_list.append([content,"","","",""])
+    # student_sheet.update_cell(currentRow, 1, content)
+    # student_sheet.update_cell(currentRow,5, comments)
 
-    student_sheet.update_cell(currentRow, 1, content)
-    student_sheet.update_cell(currentRow,5, comments)
-    currentRow += 1
     #print(content + "\n----------------------------------------")
 
 
 student_rows = student_sheet.get_all_values()
 
-for src_row in src_rows:
-    groupName = src_row[1]
-    contactName = src_row[5]
-    print "Group " + groupName
-    print "Contact " + contactName
-    for student_row in student_rows:
-        #student_row[0] = full content
-        #student_row[1] = Names
-        #student_row[3] = Phone number
-        #student_row[4] = 810s
-        #student_row[5] = special comments
-        if groupName in student_row[0] and contactName in student_row[0]:
-            print "\nMatch--------------------------"
-            print "Src: " + groupName + " ," + contactName
-            print "Student: " + student_row[0]
+mergeList = student_rows + src_sheet_row_list
+mergeList.pop(0) #gets rid of header row
+
+sortedMergedList = sorted(mergeList, key=lambda item: stringToDatetime(item[0]))
+
+
+
+for row in sortedMergedList:
+   print stringToDatetime(row[0]).strftime("%m/%d/%Y")
+
+
+##################UNTESTED#########################################
+# for row in sortedMergedList:
+#     if(datetime.now() > stringToDatetime(row[0])):
+#         #write to final_sheet
+#         #remove from sortedMergedList
+#         print "Its in the past"
+
+# rangeToClear = "A2:B" + str(len(student_rows))
+# clearCells(rangeToClear)
+
+# currentRow = 2
+# for row in sortedMergedList:
+#     student_sheet.update_cell(currentRow,1,row[0]) #content
+#     student_sheet.update_cell(currentRow,2,row[1]) #names
+#     student_sheet.update_cell(currentRow,3,row[2]) #phone numbers
+#     student_sheet.update_cell(currentRow,4,row[3]) #810s
+#     student_sheet.update_cell(currentRow,5,row[4]) #special notes
+#     currentRow += 1
+# rangeToClear="A2:N" + str(len(src_rows))
+# clearCells(rangeToClear)
+
 
 
 
